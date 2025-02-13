@@ -1,4 +1,4 @@
-name: Deploy to EC2 
+name: Deploy to EC2  
 
 on:
   push:
@@ -19,7 +19,6 @@ jobs:
     - name: Construir y subir imagen a Docker Hub
       run: |
         docker build -t ${{ secrets.DOCKER_USERNAME }}/board-create-service .
-        docker tag ${{ secrets.DOCKER_USERNAME }}/board-create-service:latest ${{ secrets.DOCKER_USERNAME }}/board-create-service:latest
         docker push ${{ secrets.DOCKER_USERNAME }}/board-create-service:latest
 
     - name: Configurar EC2, instalar Docker y desplegar
@@ -29,35 +28,31 @@ jobs:
         username: ec2-user  # Usuario correcto para Amazon Linux
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          # Actualizar paquetes
+          echo "🔄 Actualizando paquetes..."
           sudo dnf update -y
 
-          # Instalar Docker si no está instalado
+          echo "🛠 Instalando Docker si no está presente..."
           if ! command -v docker &> /dev/null; then
-            echo "Instalando Docker..."
             sudo dnf install -y docker
             sudo systemctl start docker
             sudo systemctl enable docker
             sudo usermod -aG docker ec2-user
-          else
-            echo "Docker ya está instalado."
           fi
-
-          # Iniciar Docker si está detenido
+          
+          echo "🚀 Asegurando que Docker está corriendo..."
           sudo systemctl start docker
           sudo systemctl enable docker
 
-          # Instalar Docker Compose si no está instalado
+          echo "🔧 Instalando Docker Compose si no está instalado..."
           if ! command -v docker-compose &> /dev/null; then
-            echo "Instalando Docker Compose..."
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
-          else
-            echo "Docker Compose ya está instalado."
           fi
 
-          # Crear el archivo .env si no existe
-          echo "Creando archivo .env en EC2..."
+          echo "🔍 Verificando red Docker..."
+          docker network ls | grep taskify-network || docker network create taskify-network
+
+          echo "📂 Creando archivo .env en EC2..."
           cat <<EOT > .env
           DB_USER=postgres
           DB_HOST=database-board.ccu0ctaytxmv.us-east-1.rds.amazonaws.com
@@ -69,12 +64,15 @@ jobs:
           EOT
           chmod 600 .env
 
-          # Descargar la última imagen desde Docker Hub
+          echo "📥 Descargando nueva imagen desde Docker Hub..."
           docker pull ${{ secrets.DOCKER_USERNAME }}/board-create-service:latest
           
-          # Detener y eliminar el contenedor anterior si existe
+          echo "🛑 Deteniendo y eliminando contenedor anterior..."
           docker stop board-create-service || true
           docker rm board-create-service || true
           
-          # Ejecutar el nuevo contenedor asegurando que el archivo .env está presente
-          docker run -d --name board-create-service -p 4000:4000 --env-file .env ${{ secrets.DOCKER_USERNAME }}/board-create-service:latest
+          echo "🚀 Iniciando nuevo contenedor..."
+          docker run -d --name board-create-service -p 4000:4000 --restart=always --network=taskify-network --env-file .env \
+            ${{ secrets.DOCKER_USERNAME }}/board-create-service:latest
+
+          echo "✅ Despliegue completado con éxito."
