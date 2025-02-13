@@ -32,7 +32,7 @@ jobs:
           # Actualizar paquetes
           sudo dnf update -y
 
-          # Instalar Docker en Amazon Linux 2023
+          # Instalar Docker si no está instalado
           if ! command -v docker &> /dev/null; then
             echo "Instalando Docker..."
             sudo dnf install -y docker
@@ -47,7 +47,7 @@ jobs:
           sudo systemctl start docker
           sudo systemctl enable docker
 
-          # Instalar Docker Compose
+          # Instalar Docker Compose si no está instalado
           if ! command -v docker-compose &> /dev/null; then
             echo "Instalando Docker Compose..."
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -56,6 +56,19 @@ jobs:
             echo "Docker Compose ya está instalado."
           fi
 
+          # Crear el archivo .env si no existe
+          echo "Creando archivo .env en EC2..."
+          cat <<EOT > .env
+          DB_USER=postgres
+          DB_HOST=database-board.ccu0ctaytxmv.us-east-1.rds.amazonaws.com
+          DB_NAME=database-board
+          DB_PASSWORD=sis12345
+          DB_PORT=5432
+          PORT=4000
+          JWT_SECRET=supersecreto
+          EOT
+          chmod 600 .env
+
           # Descargar la última imagen desde Docker Hub
           docker pull ${{ secrets.DOCKER_USERNAME }}/board-create-service:latest
           
@@ -63,5 +76,5 @@ jobs:
           docker stop board-create-service || true
           docker rm board-create-service || true
           
-          # Ejecutar el nuevo contenedor
+          # Ejecutar el nuevo contenedor asegurando que el archivo .env está presente
           docker run -d --name board-create-service -p 4000:4000 --env-file .env ${{ secrets.DOCKER_USERNAME }}/board-create-service:latest
