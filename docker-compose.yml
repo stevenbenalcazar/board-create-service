@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  board-create-service:
+    build: .
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: taskify
+    ports:
+      - "5432:5432"
