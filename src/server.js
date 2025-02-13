@@ -1,3 +1,4 @@
+require('dotenv').config(); // Cargar variables de entorno
 const express = require('express');
 const cors = require('cors');
 const routes = require('./routes');
