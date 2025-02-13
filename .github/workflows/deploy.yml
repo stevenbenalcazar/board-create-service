@@ -26,26 +26,23 @@ jobs:
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.EC2_HOST }}
-        username: ubuntu
+        username: ec2-user  # ⚠️ CORREGIDO para Amazon Linux
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           # Actualizar paquetes
-          sudo apt update && sudo apt upgrade -y
+          sudo yum update -y
 
           # Instalar Docker si no está instalado
           if ! command -v docker &> /dev/null; then
             echo "Docker no encontrado, instalando..."
-            curl -fsSL https://get.docker.com -o get-docker.sh
-            sudo sh get-docker.sh
-            sudo usermod -aG docker ubuntu
-            newgrp docker
+            sudo amazon-linux-extras enable docker
+            sudo yum install -y docker
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            sudo usermod -aG docker ec2-user
           else
             echo "Docker ya está instalado."
           fi
-
-          # Iniciar Docker si está detenido
-          sudo systemctl start docker
-          sudo systemctl enable docker
 
           # Instalar Docker Compose si no está instalado
           if ! command -v docker-compose &> /dev/null; then
@@ -53,15 +50,4 @@ jobs:
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
           else
-            echo "Docker Compose ya está instalado."
-          fi
-
-          # Descargar la última imagen desde Docker Hub
-          docker pull ${{ secrets.DOCKER_USERNAME }}/board-create-service:latest
-          
-          # Detener y eliminar el contenedor anterior si existe
-          docker stop board-create-service || true
-          docker rm board-create-service || true
-          
-          # Ejecutar el nuevo contenedor
-          docker run -d --name board-create-service -p 4000:4000 --env-file .env ${{ secrets.DOCKER_USERNAME }}/board-create-service:latest
+            echo "Docker Compose ya está instala
